@@ -1,0 +1,41 @@
+name: Buidld and publish python package to nexus
+
+on:
+  push:
+    branches:
+      - nexus
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install build & twine
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+
+      - name: Build package
+        run: |
+          python -m build
+
+      - name: List build output
+        run: |
+          ls -la
+          ls -la dist
+
+      - name: upload package to Nexus PyPI
+        env:
+          TWINE_USERNAME: ${{ secrets.NEXUS_USERNAME }}
+          TWINE_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+        run: |
+          twine upload --repository-url "${{ secrets.NEXUS_REPOSITORY_URL }}" dist/*.tar.gz dist/*.whl
+          

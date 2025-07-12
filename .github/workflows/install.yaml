@@ -1,0 +1,28 @@
+name: Test python package from nexus
+
+on:
+  push:
+    branches:
+      - implements
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependency from nexus
+        env:
+          NEXUS_USERNAME: ${{ secrets.NEXUS_USERNAME }}
+          NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+        run: |
+          python install mi_lib \
+          --index-url http://"${{secrets.NEXUS_USERNAME}}:${{secrets.NEXUS_PASSWORD}}@${{secrets.HOSTNAME}}:${{secrets.NEXUS_PORT}}/repository/MyLibrarie/simple/ \
+          --trusted-hosts ${{secrets.HOSTNAME}}
