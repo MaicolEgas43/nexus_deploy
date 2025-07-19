@@ -125,7 +125,7 @@ jobs:
         uses: actions/checkout@v4
         
       - name: 🔧 Configurar Docker
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
         
       - name: 🏷️ Generar tags para la imagen
         id: meta
@@ -172,7 +172,7 @@ jobs:
     
     steps:
       - name: 📥 Descargar imagen
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: docker-image
           path: /tmp/
@@ -205,7 +205,7 @@ jobs:
     
     steps:
       - name: 📥 Descargar imagen
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: docker-image
           path: /tmp/
