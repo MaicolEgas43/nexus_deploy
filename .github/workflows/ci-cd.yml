@@ -27,7 +27,7 @@ env:
   
   # TODO: Cambiar por tu URL de Nexus
   NEXUS_URL: ${{ vars.NEXUS_URL || 'http://ec2-13-223-57-61.compute-1.amazonaws.com' }}
-  NEXUS_DOCKER_PORT: ${{ vars.NEXUS_PORT || '8081' }}
+  NEXUS_PORT: ${{ vars.NEXUS_PORT || '8081' }}
 
 # =============================================================================
 # JOBS DEL PIPELINE (Se ejecutan en orden)

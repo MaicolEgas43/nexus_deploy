@@ -24,7 +24,7 @@ Configura estas en: `Repositorio → Settings → Secrets and variables → Acti
 | Variable | ¿Qué es? | Ejemplo | ¿Para qué? |
 |----------|----------|---------|------------|
 | `NEXUS_URL` | URL de Nexus | `http://ec2-13-223-57-61.compute-1.amazonaws.com` | Conectar a Nexus |
-| `NEXUS_DOCKER_PORT` | Puerto Docker | `8081` | Subir imágenes |
+| `NEXUS_PORT` | Puerto Docker | `8081` | Subir imágenes |
 | `ENABLE_SECURITY_SCAN` | ¿Escanear seguridad? | `true` | Activar/desactivar Trivy |
 
 ## 🛠️ Configuración Paso a Paso
@@ -65,7 +65,7 @@ EC2_USER = ubuntu
 
 ```
 NEXUS_URL = http://tu-nexus-server.com
-NEXUS_DOCKER_PORT = 8081
+NEXUS_PORT = 8081
 ENABLE_SECURITY_SCAN = true
 ```
 
@@ -87,7 +87,7 @@ ssh -i ~/.ssh/devops-key ubuntu@$EC2_HOST "docker --version" || echo "❌ Docker
 
 # Verificar Nexus
 echo "📦 Probando conexión a Nexus..."
-curl -f -s "$NEXUS_URL:$NEXUS_DOCKER_PORT" && echo "✅ Nexus accesible" || echo "❌ Nexus no accesible"
+curl -f -s "$NEXUS_URL:$NEXUS_PORT" && echo "✅ Nexus accesible" || echo "❌ Nexus no accesible"
 
 echo "✨ Verificación completada"
 ```
