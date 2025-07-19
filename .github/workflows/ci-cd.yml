@@ -20,6 +20,12 @@ on:
         required: false
         default: 'false'
 
+# PERMISOS NECESARIOS - Para crear tags y leer repositorio
+permissions:
+  contents: write         # Crear tags de versión
+  packages: write         # Subir paquetes si es necesario
+  actions: read          # Leer otros workflows
+
 # VARIABLES GLOBALES
 env:
   APP_NAME: "store-management-api"

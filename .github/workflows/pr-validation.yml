@@ -13,6 +13,13 @@ on:
     branches: [develop, main]
     types: [opened, synchronize, reopened]
 
+# PERMISOS NECESARIOS - Importante para comentar en PRs
+permissions:
+  contents: read          # Leer el código del repositorio
+  pull-requests: write    # Escribir comentarios en PRs
+  issues: write          # Necesario para algunos comentarios
+  checks: write          # Escribir status checks
+
 # VARIABLES GLOBALES
 env:
   APP_NAME: "store-management-api"
