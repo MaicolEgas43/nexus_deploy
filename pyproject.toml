@@ -1,0 +1,11 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mi_lib"
+version = "0.0.1"
+description = "Una librería de prueba para nexus"
+authors = [{ name = "Maicol Egas", email = "maicolegas43@gmail.com"}]
+requires-python = ">=3.6"
+dependencies = []
