@@ -1,0 +1,215 @@
+# =============================================================================
+# Validación de Pull Requests - Proyecto Final DevOps
+# ¿Qué hace? Verifica que el código funciona ANTES de hacer merge
+# Se ejecuta automáticamente cuando se crea o actualiza un PR
+# =============================================================================
+
+name: 🔍 Validación de PR
+
+# ¿CUÁNDO SE EJECUTA?
+# Cuando alguien crea o actualiza un Pull Request hacia develop o main
+on:
+  pull_request:
+    branches: [develop, main]
+    types: [opened, synchronize, reopened]
+
+# VARIABLES GLOBALES
+env:
+  APP_NAME: "store-management-api"
+  PYTHON_VERSION: "3.11"
+
+# =============================================================================
+# JOBS DE VALIDACIÓN (Se ejecutan en paralelo para ir más rápido)
+# =============================================================================
+jobs:
+
+  # ---------------------------------------------------------------------------
+  # JOB 1: INFO - Mostrar información del PR
+  # ---------------------------------------------------------------------------
+  info:
+    name: ℹ️ Información del PR
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📋 Mostrar información del PR
+        run: |
+          echo "🔍 VALIDANDO PULL REQUEST"
+          echo "=================================="
+          echo "📝 PR #${{ github.event.number }}: ${{ github.event.pull_request.title }}"
+          echo "🌿 De: ${{ github.head_ref }} → ${{ github.base_ref }}"
+          echo "👤 Autor: ${{ github.actor }}"
+          echo "=================================="
+
+  # ---------------------------------------------------------------------------
+  # JOB 2: TESTS - Verificar que el código funciona
+  # ---------------------------------------------------------------------------
+  test:
+    name: 🧪 Ejecutar Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Descargar código del PR
+        uses: actions/checkout@v4
+        
+      - name: 🐍 Configurar Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          
+      - name: 📦 Instalar dependencias
+        run: |
+          echo "Instalando dependencias..."
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov black flake8
+          
+      - name: 🎨 Verificar formato del código
+        run: |
+          echo "Verificando que el código esté bien formateado..."
+          black --check app/ tests/ || echo "⚠️ El código necesita formateo con: black app/ tests/"
+          flake8 app/ tests/ --max-line-length=88 || echo "⚠️ Hay problemas de estilo de código"
+          
+      - name: ✅ Ejecutar tests unitarios
+        run: |
+          echo "Ejecutando tests..."
+          pytest tests/ -v --cov=app --cov-report=term-missing
+          echo "✅ Tests del PR completados!"
+
+  # ---------------------------------------------------------------------------
+  # JOB 3: BUILD - Verificar que la imagen Docker se construye
+  # ---------------------------------------------------------------------------
+  build:
+    name: 🐳 Verificar Build Docker
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Descargar código del PR
+        uses: actions/checkout@v4
+        
+      - name: 🔧 Configurar Docker
+        uses: docker/setup-buildx-action@v3
+        
+      - name: 🔨 Intentar construir imagen Docker
+        run: |
+          echo "Verificando que la imagen Docker se puede construir..."
+          docker build -t test-${{ env.APP_NAME }}:pr-${{ github.event.number }} .
+          echo "✅ Imagen Docker construida exitosamente!"
+          
+      - name: 🧪 Probar que la imagen funciona
+        run: |
+          echo "Probando que la imagen Docker funciona..."
+          # Ejecutar un test básico de que Python puede importar la app
+          docker run --rm test-${{ env.APP_NAME }}:pr-${{ github.event.number }} python -c "from app.main import app; print('✅ App se puede importar correctamente')"
+
+  # ---------------------------------------------------------------------------
+  # JOB 4: SECURITY - Escaneo básico de seguridad (opcional)
+  # ---------------------------------------------------------------------------
+  security:
+    name: 🛡️ Escaneo Básico de Seguridad
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: ${{ vars.ENABLE_SECURITY_SCAN != 'false' }}
+    
+    steps:
+      - name: 📥 Descargar código del PR
+        uses: actions/checkout@v4
+        
+      - name: 🔧 Configurar Docker
+        uses: docker/setup-buildx-action@v3
+        
+      - name: 🔨 Construir imagen para escanear
+        run: |
+          docker build -t security-test:pr-${{ github.event.number }} .
+          
+      - name: 🔍 Escanear vulnerabilidades
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'security-test:pr-${{ github.event.number }}'
+          format: 'table'
+          exit-code: '0'  # No fallar el PR por vulnerabilidades, solo reportar
+          
+      - name: 📊 Resultado del escaneo
+        run: |
+          echo "🛡️ Escaneo de seguridad completado para el PR"
+          echo "ℹ️ Si hay vulnerabilidades críticas, considera corregirlas antes del merge"
+
+  # ---------------------------------------------------------------------------
+  # JOB 5: RESULTADO - Mostrar resumen final
+  # ---------------------------------------------------------------------------
+  resultado:
+    name: 📊 Resultado Final
+    runs-on: ubuntu-latest
+    needs: [info, test, build, security]
+    if: always()
+    
+    steps:
+      - name: 📊 Evaluar resultados
+        id: resultado
+        run: |
+          echo "Evaluando resultados del PR..."
+          
+          # Verificar que los jobs críticos pasaron
+          if [[ "${{ needs.test.result }}" == "success" && "${{ needs.build.result }}" == "success" ]]; then
+            echo "status=✅ PR LISTO PARA REVIEW" >> $GITHUB_OUTPUT
+            echo "color=28a745" >> $GITHUB_OUTPUT  # Verde
+            echo "ready=true" >> $GITHUB_OUTPUT
+          else
+            echo "status=❌ PR NECESITA CORRECCIONES" >> $GITHUB_OUTPUT
+            echo "color=dc3545" >> $GITHUB_OUTPUT  # Rojo
+            echo "ready=false" >> $GITHUB_OUTPUT
+          fi
+          
+          # Security es opcional
+          if [[ "${{ needs.security.result }}" != "success" && "${{ needs.security.result }}" != "skipped" ]]; then
+            echo "security_note=⚠️ Revisar issues de seguridad" >> $GITHUB_OUTPUT
+          fi
+          
+      - name: 💬 Comentar en el PR
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: validation-results
+          message: |
+            ## 📊 Resultados de Validación - PR #${{ github.event.number }}
+            
+            **Estado:** ${{ steps.resultado.outputs.status }}
+            
+            ### 📋 Checks Realizados
+            
+            | Check | Resultado |
+            |-------|-----------|
+            | 🧪 Tests | ${{ needs.test.result == 'success' && '✅ Pasaron' || '❌ Fallaron' }} |
+            | 🐳 Build Docker | ${{ needs.build.result == 'success' && '✅ Exitoso' || '❌ Falló' }} |
+            | 🛡️ Seguridad | ${{ needs.security.result == 'success' && '✅ Sin problemas críticos' || needs.security.result == 'skipped' && '⏭️ Omitido' || '⚠️ Issues encontrados' }} |
+            
+            ${{ steps.resultado.outputs.security_note && format('### ⚠️ Notas\n{0}', steps.resultado.outputs.security_note) || '' }}
+            
+            ### 🎯 Próximos Pasos
+            
+            ${{ steps.resultado.outputs.ready == 'true' && '✅ **Este PR está listo para review y puede ser mergeado**' || '❌ **Este PR necesita correcciones antes del merge**' }}
+            
+            ${{ steps.resultado.outputs.ready == 'false' && '
+            #### 🔧 ¿Cómo corregir?
+            1. Revisa los logs de los jobs que fallaron arriba
+            2. Corrige los problemas en tu branch
+            3. Haz push - esta validación se ejecutará automáticamente' || '' }}
+            
+            ---
+            *✨ Validación automática ejecutada por GitHub Actions*
+            
+      - name: 📝 Resumen en consola
+        run: |
+          echo "📊 RESUMEN DE VALIDACIÓN"
+          echo "========================"
+          echo "📝 PR: #${{ github.event.number }}"
+          echo "🧪 Tests: ${{ needs.test.result }}"
+          echo "🐳 Build: ${{ needs.build.result }}"
+          echo "🛡️ Security: ${{ needs.security.result }}"
+          echo "📊 Estado: ${{ steps.resultado.outputs.status }}"
+          echo "========================"
+          
+          if [[ "${{ steps.resultado.outputs.ready }}" == "true" ]]; then
+            echo "🎉 ¡PR listo para review!"
+          else
+            echo "🔧 PR necesita correcciones"
+          fi 

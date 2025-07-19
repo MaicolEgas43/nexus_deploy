@@ -1,0 +1,28 @@
+# Core FastAPI y servidor
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+
+# Validación de datos y modelos
+pydantic==2.9.2
+email-validator==2.1.0  # Para EmailStr en modelos
+
+# Base de datos
+sqlalchemy==1.4.48
+databases[postgresql]==0.8.0
+asyncpg==0.29.0  
+psycopg2-binary==2.9.7
+
+# Métricas y monitoreo
+prometheus-client==0.19.0
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+httpx==0.25.2
+
+# Utilities
+python-multipart==0.0.6  # Para formularios en FastAPI
+python-dateutil==2.8.2   # Para manejo avanzado de fechas
+
+# Legacy (mantener temporalmente durante migración)
+flask==2.3.2

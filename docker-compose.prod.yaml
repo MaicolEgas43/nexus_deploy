@@ -1,0 +1,179 @@
+# =============================================================================
+# Docker Compose para Producción - Proyecto Final DevOps
+# Stack: FastAPI + PostgreSQL + Prometheus + Grafana + Nexus
+# =============================================================================
+
+version: '3.8'
+
+services:
+  # =============================================================================
+  # TU APLICACIÓN PRINCIPAL - Store Management API
+  # =============================================================================
+  store-api:
+    image: ${IMAGE_TAG:-nexus.company.com:8081/store-management-api:latest}
+    container_name: store-api-prod
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/store
+      - PYTHONPATH=/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - app-network
+      - monitoring-network
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    # Labels para que Prometheus pueda encontrar tu app
+    labels:
+      - "prometheus.scrape=true"
+      - "prometheus.port=8000"
+      - "prometheus.path=/metrics"
+    volumes:
+      - app_data:/app/data
+
+  # =============================================================================
+  # BASE DE DATOS - PostgreSQL
+  # =============================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres-prod
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: store
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d store"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # =============================================================================
+  # MONITOREO - Prometheus (Recolecta métricas)
+  # =============================================================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus-prod
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - monitoring-network
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'  # Guardar datos por 30 días
+
+  # =============================================================================
+  # VISUALIZACIÓN - Grafana (Dashboards bonitos)
+  # =============================================================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana-prod
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      # Configuración básica
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-clock-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - monitoring-network
+    restart: unless-stopped
+
+  # =============================================================================
+  # REGISTRY - Nexus (Tu biblioteca de imágenes Docker)
+  # =============================================================================
+  nexus:
+    image: sonatype/nexus3:latest
+    container_name: nexus-prod
+    ports:
+      - "8081:8081"    # Interface web
+    volumes:
+      - nexus_data:/nexus-data
+    networks:
+      - app-network
+    restart: unless-stopped
+    environment:
+      - NEXUS_SECURITY_RANDOMPASSWORD=false
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/service/rest/v1/status"]
+      interval: 60s
+      timeout: 30s
+      retries: 3
+      start_period: 120s  # Nexus tarda en arrancar
+
+# =============================================================================
+# VOLÚMENES - Para guardar datos persistentes
+# =============================================================================
+volumes:
+  app_data:          # Datos de tu aplicación
+    driver: local
+    
+  postgres_data:     # Base de datos
+    driver: local
+    
+  prometheus_data:   # Métricas históricas
+    driver: local
+    
+  grafana_data:      # Configuración de dashboards
+    driver: local
+    
+  nexus_data:        # Registry de imágenes
+    driver: local
+
+# =============================================================================
+# REDES - Para que los contenedores se comuniquen
+# =============================================================================
+networks:
+  app-network:          # Red para app + database
+    driver: bridge
+    
+  monitoring-network:   # Red para monitoreo
+    driver: bridge
+
+# =============================================================================
+# INSTRUCCIONES DE USO
+# =============================================================================
+# 
+# 1. Configurar variables de entorno:
+#    export IMAGE_TAG=tu-nexus:8081/store-management-api:v1.0.1
+#
+# 2. Ejecutar en producción:
+#    docker-compose -f docker-compose.prod.yaml up -d
+#
+# 3. Verificar que todo funciona:
+#    curl http://localhost:8000/health
+#    open http://localhost:3000 (Grafana - admin/admin123)
+#    open http://localhost:9090 (Prometheus)
+#    open http://localhost:8081 (Nexus - admin/admin123)
+#
+# 4. Ver logs:
+#    docker-compose -f docker-compose.prod.yaml logs -f store-api
+#
+# 5. Actualizar aplicación:
+#    docker-compose -f docker-compose.prod.yaml pull store-api
+#    docker-compose -f docker-compose.prod.yaml up -d store-api
+#
+# =============================================================================
