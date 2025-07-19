@@ -28,12 +28,12 @@ permissions:
 
 # VARIABLES GLOBALES
 env:
-  APP_NAME: "store-management-api"
-  PYTHON_VERSION: "3.11"
+  APP_NAME: "app-fastapi"
+  PYTHON_VERSION: ${{ vars.PYTHON_VERSION }}
   
   # TODO: Cambiar por tu URL de Nexus
-  NEXUS_URL: ${{ vars.NEXUS_URL || 'http://ec2-13-223-57-61.compute-1.amazonaws.com' }}
-  NEXUS_PORT: ${{ vars.NEXUS_PORT || '8081' }}
+  NEXUS_URL: ${{ vars.NEXUS_URL }}
+  NEXUS_PORT: ${{ vars.NEXUS_PORT }}
 
 # =============================================================================
 # JOBS DEL PIPELINE (Se ejecutan en orden)
@@ -125,7 +125,7 @@ jobs:
         uses: actions/checkout@v4
         
       - name: 🔧 Configurar Docker
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
         
       - name: 🏷️ Generar tags para la imagen
         id: meta
@@ -155,7 +155,7 @@ jobs:
           docker save ${{ steps.meta.outputs.image_tag }} > /tmp/app-image.tar
           
       - name: 📤 Subir imagen como artefacto temporal
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: docker-image
           path: /tmp/app-image.tar
@@ -172,7 +172,7 @@ jobs:
     
     steps:
       - name: 📥 Descargar imagen
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: docker-image
           path: /tmp/
@@ -205,7 +205,7 @@ jobs:
     
     steps:
       - name: 📥 Descargar imagen
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: docker-image
           path: /tmp/
@@ -265,8 +265,7 @@ jobs:
             set -e
             echo "📦 Deployando versión ${VERSION}..."
             
-            # Crear directorio si no existe
-            mkdir -p /home/ubuntu/app-fastapi
+            # Ir al directorio de la aplicación
             cd /home/ubuntu/app-fastapi
             
             # Login a Nexus desde EC2
@@ -333,3 +332,6 @@ jobs:
           echo "📊 Métricas en: http://${{ secrets.EC2_HOST }}:8000/metrics"
           echo "📈 Prometheus: http://${{ secrets.EC2_HOST }}:9090"
           echo "📊 Grafana: http://${{ secrets.EC2_HOST }}:3000" 
+
+          # En tu EC2, ejecutas UNA VEZ:
+          docker-compose -f docker-compose.prod.yaml up -d

@@ -9,9 +9,9 @@ services:
   # =============================================================================
   # TU APLICACIÓN PRINCIPAL - Store Management API
   # =============================================================================
-  store-api:
-    image: ${IMAGE_TAG:-nexus.company.com:8081/store-management-api:latest}
-    container_name: store-api-prod
+  app-fasta pi:
+    image: ${IMAGE_TAG:-nexus.company.com:8081/app-fastapi:latest}
+    container_name: app-fastapi-prod
     ports:
       - "8000:8000"
     environment:
@@ -37,7 +37,7 @@ services:
       - "prometheus.path=/metrics"
     volumes:
       - app_data:/app/data
-
+  
   # =============================================================================
   # BASE DE DATOS - PostgreSQL
   # =============================================================================
