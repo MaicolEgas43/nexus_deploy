@@ -31,9 +31,9 @@ env:
   APP_NAME: "app-fastapi"
   PYTHON_VERSION: ${{ vars.PYTHON_VERSION }}
   
-  # TODO: Cambiar por tu URL de Nexus
-  NEXUS_URL: ${{ vars.NEXUS_URL }}
-  NEXUS_PORT: ${{ vars.NEXUS_PORT }}
+  # URL de tu Nexus en EC2
+  NEXUS_URL: ec2-13-223-57-61.compute-1.amazonaws.com
+  NEXUS_PORT: 8081
 
 # =============================================================================
 # JOBS DEL PIPELINE (Se ejecutan en orden)
