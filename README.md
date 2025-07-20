@@ -1,9 +1,4 @@
-# 🚀 Store Management API - Proyecto DevOps
-
-[![CI/CD Pipeline](https://github.com/your-org/artefacts_devops/workflows/CI/CD%20Pipeline/badge.svg)](https://github.com/your-org/artefacts_devops/actions)
-[![Docker](https://img.shields.io/docker/v/your-org/store-management-api?sort=semver)](https://hub.docker.com/r/your-org/store-management-api)
-[![Python](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.104.1-green.svg)](https://fastapi.tiangolo.com/)
+# 🚀 Proyecto DevOps
 
 ## 📋 Descripción
 
@@ -433,14 +428,6 @@ Este proyecto está bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) par
 ## 👥 Autores
 
 - **Tu Nombre** - *Desarrollo inicial* - [tu-usuario](https://github.com/tu-usuario)
-
-## 🙏 Agradecimientos
-
-- FastAPI por el framework web
-- Prometheus/Grafana por el stack de monitoreo
-- Docker por la containerización
-- GitHub Actions por CI/CD
-
 ---
 
 ## 📚 Enlaces Útiles
@@ -453,5 +440,3 @@ Este proyecto está bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) par
 - [Nexus Repository](https://help.sonatype.com/repomanager3)
 
 ---
-
-**¿Preguntas?** Abre un [issue](https://github.com/your-org/artefacts_devops/issues) o contacta al equipo de DevOps. 

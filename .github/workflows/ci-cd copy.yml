@@ -1,0 +1,181 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  release:
+    types: [ published ]
+
+env:
+  PYTHON_VERSION: "3.11"
+  REGISTRY_URL: "localhost:8085"  # Nexus Docker Registry
+  IMAGE_NAME: "store-management-api"
+
+jobs:
+  # Job 1: Testing y Análisis de Código
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+          
+    - name: Install dependencies from nexus
+      env:
+        NEXUS_USERNAME: ${{ secrets.NEXUS_USERNAME }}
+        NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+      run: |
+        python install mi_lib \
+          --index-url http://"${{secrets.NEXUS_USERNAME}}:${{secrets.NEXUS_PASSWORD}}@${{secrets.HOSTNAME}}:${{secrets.NEXUS_PORT}}/repository/MyLibrarie/simple/ \
+          --trusted-hosts ${{secrets.HOSTNAME}}
+  
+    - name: Upload test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: test-results
+        path: |
+          htmlcov/
+          bandit-report.json
+          coverage.xml
+
+  # Job 2: Build Docker Image
+  build:
+    # needs: test
+    runs-on: ubuntu-latest
+    
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY_URL }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=sha,prefix={{branch}}-
+          
+    - name: Build Docker image
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile
+        push: false
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        outputs: type=docker,dest=/tmp/image.tar
+        
+    - name: Upload Docker image artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: docker-image
+        path: /tmp/image.tar
+        retention-days: 1
+
+
+        
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  # Job 3: Publish to Nexus (solo en main y releases)
+  publish:
+    needs: [test, build]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.event_name == 'release'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install build & twine
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+
+      - name: Build package
+        run: |
+          python -m build
+
+      - name: List build output
+        run: |
+          ls -la
+          ls -la dist
+
+      - name: upload package to Nexus PyPI
+        env:
+          TWINE_USERNAME: ${{ secrets.NEXUS_USERNAME }}
+          TWINE_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+        run: |
+          twine upload --repository-url "${{ secrets.NEXUS_REPOSITORY_URL }}" dist/*.tar.gz dist/*.whl
+
+  # Job 4: Deploy (solo en main)
+  deploy:
+    needs: [test, build, publish]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup SSH key  
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/ec2-key
+        chmod 600 ~/.ssh/ec2-key
+        
+    - name: Deploy to EC2 with Docker setup
+      run: |
+        chmod +x scripts/deploy-ec2.sh
+        ./scripts/deploy-ec2.sh ${{ secrets.EC2_HOST }}
+        
+    - name: Run smoke tests
+      run: |
+        echo "Running smoke tests..."
+        # Verificar que el despliegue fue exitoso
+        sleep 30
+        curl -f http://staging.yourdomain.com/api/v1/health || exit 1
+
+  # Job 5: Cleanup
+  cleanup:
+    needs: [test, build, publish, deploy]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Delete artifacts
+      uses: geekyeggo/delete-artifact@v2
+      with:
+        name: |
+          docker-image
+          test-results 
