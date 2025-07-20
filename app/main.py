@@ -63,7 +63,6 @@ async def shutdown_event():
     """Ejecutar al cerrar la aplicación"""
     await shutdown_db()
 
-# Incluir todos los routers organizados por funcionalidad
 include_all_routers(app)
 
 @app.get("/", tags=["Root"])

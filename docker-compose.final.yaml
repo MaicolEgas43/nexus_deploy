@@ -1,15 +1,17 @@
 # =============================================================================
-# Docker Compose para Producción - Proyecto Final DevOps
-# Stack: FastAPI + PostgreSQL + Prometheus + Grafana + Nexus
+# Docker Compose FINAL - Con Nexus Configurado
+# Usar DESPUÉS de configurar Docker registry en Nexus
 # =============================================================================
 
 version: '3.8'
 
 services:
   # =============================================================================
-  # APLICACIÓN PRINCIPAL - Store Management API
+  # TU APLICACIÓN PRINCIPAL - Store Management API
   # =============================================================================
   app-fastapi:
+    # DESPUÉS de configurar Nexus, cambiar a:
+    # image: ${IMAGE_TAG:-ec2-13-223-57-61.compute-1.amazonaws.com:8082/app-fastapi:latest}
     image: ${IMAGE_TAG:-nginx:alpine}
     container_name: app-fastapi-prod
     ports:
@@ -31,11 +33,11 @@ services:
     # Labels para que Prometheus pueda encontrar tu app
     labels:
       - "prometheus.scrape=true"
-      - "prometheus.port=8000"
+      - "prometheus.port=80"
       - "prometheus.path=/metrics"
     volumes:
       - app_data:/app/data
-  
+
   # =============================================================================
   # BASE DE DATOS - PostgreSQL
   # =============================================================================
@@ -43,18 +45,16 @@ services:
     image: postgres:15-alpine
     container_name: postgres-prod
     environment:
+      POSTGRES_DB: store
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: store
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - app-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d store"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -108,6 +108,7 @@ services:
     container_name: nexus-prod
     ports:
       - "8081:8081"    # Interface web
+      - "8082:8082"    # Docker registry (configurar en Nexus)
     volumes:
       - nexus_data:/nexus-data
     networks:
@@ -119,59 +120,31 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:8081/service/rest/v1/status"]
       interval: 60s
       timeout: 30s
-      retries: 3
-      start_period: 120s  # Nexus tarda en arrancar
+      retries: 5
+      start_period: 120s
 
 # =============================================================================
-# VOLÚMENES - Para guardar datos persistentes
-# =============================================================================
-volumes:
-  app_data:          # Datos de tu aplicación
-    driver: local
-    
-  postgres_data:     # Base de datos
-    driver: local
-    
-  prometheus_data:   # Métricas históricas
-    driver: local
-    
-  grafana_data:      # Configuración de dashboards
-    driver: local
-    
-  nexus_data:        # Registry de imágenes
-    driver: local
-
-# =============================================================================
-# REDES - Para que los contenedores se comuniquen
+# NETWORKS - Conectividad entre servicios
 # =============================================================================
 networks:
-  app-network:          # Red para app + database
+  app-network:
     driver: bridge
-    
-  monitoring-network:   # Red para monitoreo
+    name: app-network
+  monitoring-network:
     driver: bridge
+    name: monitoring-network
 
 # =============================================================================
-# INSTRUCCIONES DE USO
+# VOLUMES - Persistencia de datos
 # =============================================================================
-# 
-# 1. Configurar variables de entorno:
-#    export IMAGE_TAG=tu-nexus:8081/store-management-api:v1.0.1
-#
-# 2. Ejecutar en producción:
-#    docker-compose -f docker-compose.prod.yaml up -d
-#
-# 3. Verificar que todo funciona:
-#    curl http://localhost:8000/health
-#    open http://localhost:3000 (Grafana - admin/admin123)
-#    open http://localhost:9090 (Prometheus)
-#    open http://localhost:8081 (Nexus - admin/admin123)
-#
-# 4. Ver logs:
-#    docker-compose -f docker-compose.prod.yaml logs -f store-api
-#
-# 5. Actualizar aplicación:
-#    docker-compose -f docker-compose.prod.yaml pull store-api
-#    docker-compose -f docker-compose.prod.yaml up -d store-api
-#
-# =============================================================================
+volumes:
+  postgres_data:
+    name: postgres_data
+  prometheus_data:
+    name: prometheus_data
+  grafana_data:
+    name: grafana_data
+  nexus_data:
+    name: nexus_data
+  app_data:
+    name: app_data 

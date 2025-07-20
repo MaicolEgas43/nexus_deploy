@@ -1,193 +1,29 @@
-# =============================================================================
-# Configuración de Prometheus para Store Management API
-# Stack: FastAPI + PostgreSQL + Nexus + Grafana
-# =============================================================================
-
 global:
-  scrape_interval: 15s          # Intervalo global de scraping
-  evaluation_interval: 15s      # Evaluación de reglas de alertas
-  external_labels:
-    cluster: 'store-management'
-    environment: 'production'
+  scrape_interval: 15s
+  evaluation_interval: 15s
 
-# Configuración de reglas de alertas
-rule_files:
-  - "rules/*.yml"
-
-# Configuración de Alertmanager (opcional)
-# alerting:
-#   alertmanagers:
-#     - static_configs:
-#         - targets:
-#           - alertmanager:9093
-
-# =============================================================================
-# CONFIGURACIÓN DE SCRAPE - Targets de monitoreo
-# =============================================================================
 scrape_configs:
-  
-  # -----------------------------------------------------------------------------
-  # PROMETHEUS SELF-MONITORING
-  # -----------------------------------------------------------------------------
+  # Monitorear Prometheus a sí mismo
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']
-    scrape_interval: 30s
-    scrape_timeout: 10s
+
+  # Monitorear tu aplicación FastAPI
+  - job_name: 'fastapi-app'
+    static_configs:
+      - targets: ['app-fastapi:80']
     metrics_path: '/metrics'
-
-  # -----------------------------------------------------------------------------
-  # STORE MANAGEMENT API - Aplicación Principal
-  # -----------------------------------------------------------------------------
-  - job_name: 'store-management-api'
-    static_configs:
-      # Para deployment local/docker-compose
-      - targets: ['store-api:8000']
-      # Para deployment en EC2 (descomentar y configurar)
-      # - targets: ['${EC2_HOST}:8000']  # TODO: Reemplazar con IP de EC2
-    metrics_path: '/metrics'
-    scrape_interval: 10s
-    scrape_timeout: 5s
-    honor_labels: true
-    # Labels adicionales para identificación
-    static_configs:
-      - targets: ['store-api:8000']
-        labels:
-          service: 'store-api'
-          app: 'store-management'
-          environment: 'production'
-          team: 'devops'
-
-  # -----------------------------------------------------------------------------
-  # BASE DE DATOS - PostgreSQL (con postgres_exporter)
-  # -----------------------------------------------------------------------------
-  - job_name: 'postgresql'
-    static_configs:
-      - targets: ['postgres-exporter:9187']  # Requiere postgres_exporter
     scrape_interval: 30s
-    scrape_timeout: 10s
-    # Labels para PostgreSQL
-    static_configs:
-      - targets: ['postgres-exporter:9187']
-        labels:
-          service: 'postgresql'
-          database: 'store'
 
-  # -----------------------------------------------------------------------------
-  # NEXUS REPOSITORY MANAGER
-  # -----------------------------------------------------------------------------
-  - job_name: 'nexus-repository'
+  # Monitorear Grafana
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['grafana:3000']
+    scrape_interval: 60s
+
+  # Monitorear Nexus
+  - job_name: 'nexus'
     static_configs:
       - targets: ['nexus:8081']
     metrics_path: '/service/metrics/prometheus'
     scrape_interval: 60s
-    scrape_timeout: 15s
-    # Headers de autenticación para Nexus
-    basic_auth:
-      username: 'admin'  # TODO: Usar variables de entorno
-      password: 'admin123'  # TODO: Usar secrets
-
-  # -----------------------------------------------------------------------------
-  # NODE EXPORTER - Métricas del sistema operativo
-  # -----------------------------------------------------------------------------
-  - job_name: 'node-exporter'
-    static_configs:
-      # Para EC2 con node_exporter instalado
-      - targets: ['${EC2_HOST}:9100']  # TODO: Reemplazar con IP de EC2
-      # Para contenedores locales
-      - targets: ['node-exporter:9100']
-    scrape_interval: 15s
-    scrape_timeout: 10s
-
-  # -----------------------------------------------------------------------------
-  # CADVISOR - Métricas de contenedores Docker
-  # -----------------------------------------------------------------------------
-  - job_name: 'cadvisor'
-    static_configs:
-      - targets: ['cadvisor:8080']
-    scrape_interval: 30s
-    scrape_timeout: 10s
-    # Métricas específicas de contenedores
-    metric_relabel_configs:
-      - source_labels: [__name__]
-        regex: 'container_.*'
-        target_label: __name__
-        replacement: '${1}'
-
-  # -----------------------------------------------------------------------------
-  # NGINX - Métricas del proxy (si se usa)
-  # -----------------------------------------------------------------------------
-  - job_name: 'nginx'
-    static_configs:
-      - targets: ['nginx:9113']  # Requiere nginx-prometheus-exporter
-    scrape_interval: 30s
-    scrape_timeout: 10s
-
-  # -----------------------------------------------------------------------------
-  # BLACKBOX EXPORTER - Health checks externos
-  # -----------------------------------------------------------------------------
-  - job_name: 'blackbox-http'
-    metrics_path: /probe
-    params:
-      module: [http_2xx]  # HTTP probe module
-    static_configs:
-      - targets:
-        - http://store-api:8000/health
-        - http://store-api:8000/docs
-        # Para EC2 (descomentar y configurar)
-        # - http://${EC2_HOST}:8000/health  # TODO: Reemplazar con IP de EC2
-    relabel_configs:
-      - source_labels: [__address__]
-        target_label: __param_target
-      - source_labels: [__param_target]
-        target_label: instance
-      - target_label: __address__
-        replacement: blackbox-exporter:9115
-
-# =============================================================================
-# CONFIGURACIÓN ESPECÍFICA PARA EC2 DEPLOYMENT
-# =============================================================================
-
-# Para usar en production con EC2, descomenta y configura:
-#
-# scrape_configs:
-#   - job_name: 'store-management-api-ec2'
-#     static_configs:
-#       - targets: ['54.123.45.67:8000']  # TODO: IP real de EC2
-#     metrics_path: '/metrics'
-#     scrape_interval: 10s
-#     scrape_timeout: 5s
-#     static_configs:
-#       - targets: ['54.123.45.67:8000']
-#         labels:
-#           service: 'store-api'
-#           environment: 'production'
-#           deployment: 'ec2'
-#           region: 'us-east-1'  # TODO: Configurar región real
-#
-#   - job_name: 'node-exporter-ec2'
-#     static_configs:
-#       - targets: ['54.123.45.67:9100']
-#     scrape_interval: 15s
-
-# =============================================================================
-# CONFIGURACIÓN AVANZADA
-# =============================================================================
-
-# Configuración de almacenamiento
-# storage:
-#   tsdb:
-#     retention: "30d"      # Retener datos por 30 días
-#     path: "/prometheus"   # Path de almacenamiento
-
-# Configuración remota (para almacenamiento en la nube)
-# remote_write:
-#   - url: "https://prometheus-remote-write-endpoint"
-#     basic_auth:
-#       username: "username"
-#       password: "password"
-
-# Configuración de tracing (opcional)
-# tracing:
-#   endpoint: "localhost:14268"
-#   sampling_fraction: 0.1
