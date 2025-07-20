@@ -9,8 +9,8 @@ services:
   # =============================================================================
   # TU APLICACIÓN PRINCIPAL - Store Management API
   # =============================================================================
-  app-fasta pi:
-    image: ${IMAGE_TAG:-nexus.company.com:8081/app-fastapi:latest}
+  app-fastapi:
+    image: ${IMAGE_TAG:-ec2-13-223-57-61.compute-1.amazonaws.com:8081/app-fastapi:latest}
     container_name: app-fastapi-prod
     ports:
       - "8000:8000"
